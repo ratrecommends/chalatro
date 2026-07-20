@@ -1,0 +1,12 @@
+text: ""
+font: "/assets/fonts/game.font"
+material: "/builtins/fonts/label-df.material"
+size {
+  x: 320.0
+  y: 64.0
+}
+leading: 1.0
+tracking: 0.0
+pivot: PIVOT_CENTER
+blend_mode: BLEND_MODE_ALPHA
+line_break: false

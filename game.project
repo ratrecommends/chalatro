@@ -4,6 +4,9 @@ main_collection = /main/main.collectionc
 [script]
 shared_state = 1
 
+[sprite]
+max_count = 256
+
 [display]
 width = 960
 height = 640
@@ -21,4 +24,3 @@ scale_mode = stretch
 
 [project]
 title = chalatro
-

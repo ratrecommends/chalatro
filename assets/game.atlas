@@ -1,0 +1,87 @@
+images {
+  image: "/assets/images/background.png"
+}
+images {
+  image: "/assets/images/pixel.png"
+}
+images {
+  image: "/assets/images/ring.png"
+}
+images {
+  image: "/assets/images/coin.png"
+}
+images {
+  image: "/assets/images/pawn.png"
+}
+images {
+  image: "/assets/images/knight.png"
+}
+images {
+  image: "/assets/images/bishop.png"
+}
+images {
+  image: "/assets/images/rook.png"
+}
+images {
+  image: "/assets/images/queen.png"
+}
+images {
+  image: "/assets/images/king.png"
+}
+images {
+  image: "/assets/images/gambit_phalanx.png"
+}
+images {
+  image: "/assets/images/gambit_laurel.png"
+}
+images {
+  image: "/assets/images/gambit_oracle.png"
+}
+images {
+  image: "/assets/images/board_frame.png"
+}
+images {
+  image: "/assets/images/panel_frame.png"
+}
+images {
+  image: "/assets/images/score_panel.png"
+}
+images {
+  image: "/assets/images/tile_light.png"
+}
+images {
+  image: "/assets/images/tile_dark.png"
+}
+images {
+  image: "/assets/images/board_frame_opaque.png"
+}
+images {
+  image: "/assets/images/panel_top.png"
+}
+images {
+  image: "/assets/images/panel_bottom.png"
+}
+images {
+  image: "/assets/images/panel_side_left.png"
+}
+images {
+  image: "/assets/images/panel_side_right.png"
+}
+images {
+  image: "/assets/images/score_panel_trimmed_v2.png"
+}
+images {
+  image: "/assets/images/obstacle_stones.png"
+}
+images {
+  image: "/assets/images/reward_popup.png"
+}
+images {
+  image: "/assets/images/reward_button.png"
+}
+images {
+  image: "/assets/images/progress_track.png"
+}
+margin: 0
+extrude_borders: 2
+inner_padding: 0

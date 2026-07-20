@@ -1,0 +1,12 @@
+default_animation: "pixel"
+material: "/builtins/materials/sprite.material"
+textures {
+  sampler: "texture_sampler"
+  texture: "/assets/game.atlas"
+}
+blend_mode: BLEND_MODE_ALPHA
+size {
+  x: 8.0
+  y: 8.0
+}
+size_mode: SIZE_MODE_MANUAL

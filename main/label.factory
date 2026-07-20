@@ -1,0 +1,2 @@
+prototype: "/main/label.go"
+load_dynamically: false
