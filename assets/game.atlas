@@ -2,6 +2,9 @@ images {
   image: "/assets/images/background.png"
 }
 images {
+  image: "/assets/images/background_hard.png"
+}
+images {
   image: "/assets/images/pixel.png"
 }
 images {
@@ -38,6 +41,24 @@ images {
   image: "/assets/images/gambit_oracle.png"
 }
 images {
+  image: "/assets/images/gambit_royal_guard.png"
+}
+images {
+  image: "/assets/images/gambit_cavalry.png"
+}
+images {
+  image: "/assets/images/gambit_bastion.png"
+}
+images {
+  image: "/assets/images/gambit_regency.png"
+}
+images {
+  image: "/assets/images/gambit_vanguard.png"
+}
+images {
+  image: "/assets/images/gambit_concord.png"
+}
+images {
   image: "/assets/images/board_frame.png"
 }
 images {
@@ -53,7 +74,16 @@ images {
   image: "/assets/images/tile_dark.png"
 }
 images {
+  image: "/assets/images/tile_light_hard.png"
+}
+images {
+  image: "/assets/images/tile_dark_hard.png"
+}
+images {
   image: "/assets/images/board_frame_opaque.png"
+}
+images {
+  image: "/assets/images/board_frame_hard.png"
 }
 images {
   image: "/assets/images/panel_top.png"
@@ -75,6 +105,9 @@ images {
 }
 images {
   image: "/assets/images/reward_popup.png"
+}
+images {
+  image: "/assets/images/gambit_choice_popup.png"
 }
 images {
   image: "/assets/images/reward_button.png"

@@ -251,6 +251,52 @@ function M.suggest_target(evaluation, desired_pieces, pressure)
     return math.max(1, math.floor((target + 4) / 5) * 5)
 end
 
+function M.retarget(evaluation, config, target)
+    local required_pieces
+    for placed_count = 1, evaluation.available_pieces do
+        if evaluation.estimated_peaks[placed_count] >= target then
+            required_pieces = placed_count
+            break
+        end
+    end
+
+    evaluation.required_pieces = required_pieces
+    evaluation.score_required_pieces = required_pieces
+    evaluation.winning_peak = required_pieces
+        and evaluation.estimated_peaks[required_pieces] or 0
+    evaluation.target = target
+    evaluation.target_ratio = evaluation.full_peak > 0
+        and target / evaluation.full_peak or math.huge
+    if not required_pieces then
+        evaluation.label = "UNREACHABLE"
+    elseif config.recovery then
+        evaluation.label = "RECOVERY"
+    elseif required_pieces <= math.max(1, evaluation.available_pieces - 2) then
+        evaluation.label = "TOO EASY"
+    elseif required_pieces == evaluation.available_pieces - 1 then
+        evaluation.label = "RELAXED"
+    elseif evaluation.target_ratio < 0.76 then
+        evaluation.label = "FAIR"
+    elseif evaluation.target_ratio < 0.87 then
+        evaluation.label = "HARD"
+    else
+        evaluation.label = "BRUTAL"
+    end
+    return evaluation
+end
+
+function M.target_for(config, figures, gambits, options)
+    if config.fixed_target then
+        return config.target, M.evaluate(config, figures, gambits, options)
+    end
+
+    local evaluation = M.evaluate(config, figures, gambits, options)
+    local desired_pieces = config.recovery and math.max(2, #figures - 1) or #figures
+    local pressure = config.recovery and 0.55 or config.hard and 0.84 or 0.72
+    local target = M.suggest_target(evaluation, desired_pieces, pressure)
+    return target, M.retarget(evaluation, config, target)
+end
+
 function M.self_test()
     local evaluation = M.evaluate({ target = 1, obstacles = {} },
         { "pawn", "pawn" }, {}, { restarts = 3, iterations = 120, seed = 7 })
@@ -262,6 +308,10 @@ function M.self_test()
         { "pawn", "pawn", "bishop" }, {},
         { restarts = 3, iterations = 120, seed = 11 })
     assert(recovery.label == "RECOVERY", "recovery flag should affect the rating")
+    local fixed_target = M.target_for({ target = 30, obstacles = {}, fixed_target = true },
+        { "pawn", "pawn", "bishop" }, {},
+        { restarts = 3, iterations = 120, seed = 13 })
+    assert(fixed_target == 30, "fixed opening targets must not be recalibrated")
     return true
 end
 

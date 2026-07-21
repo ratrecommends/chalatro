@@ -1,4 +1,6 @@
 local chess = require "logic.game.chess"
+local difficulty = require "logic.game.difficulty"
+local gambits = require "logic.game.gambits"
 local layout = require "logic.game.layout"
 local levels = require "logic.game.levels"
 
@@ -31,6 +33,9 @@ local REWARD_POPUP_IMAGE_WIDTH = 656
 local REWARD_POPUP_IMAGE_HEIGHT = 852
 local REWARD_POPUP_WIDTH = 328
 local REWARD_POPUP_HEIGHT = REWARD_POPUP_WIDTH * REWARD_POPUP_IMAGE_HEIGHT / REWARD_POPUP_IMAGE_WIDTH
+local GAMBIT_CHOICE_POPUP_IMAGE_WIDTH = 1536
+local GAMBIT_CHOICE_POPUP_IMAGE_HEIGHT = 1024
+local GAMBIT_CHOICE_POPUP_WIDTH = 680
 local REWARD_BUTTON_IMAGE_WIDTH = 410
 local REWARD_BUTTON_IMAGE_HEIGHT = 140
 local REWARD_BUTTON_WIDTH = 205
@@ -58,6 +63,7 @@ local COLORS = {
     dust = vmath.vector4(0.90, 0.82, 0.64, 0.62),
     modal_backdrop = vmath.vector4(0.025, 0.045, 0.025, 0.58),
     hover_backdrop = vmath.vector4(0.025, 0.045, 0.025, 0.46),
+    hard_ink = vmath.vector4(0.52, 0.05, 0.09, 1),
 }
 
 local Z = {
@@ -82,34 +88,10 @@ local Z = {
     popup_text = 0.97,
 }
 
-local GAMBITS = {
-    {
-        id = "phalanx",
-        animation = "gambit_phalanx",
-        name = "PHALANX",
-        description = {
-            "Reciprocal defending pairs gain",
-            "+1 additional Defense.",
-        },
-    },
-    {
-        id = "oracle",
-        animation = "gambit_oracle",
-        name = "ORACLE",
-        description = {
-            "Each Bishop on the board",
-            "adds +1 Defense.",
-        },
-    },
-}
+local GAMBITS = gambits.definitions
 
 local function gambit_by_id(id)
-    for i = 1, #GAMBITS do
-        if GAMBITS[i].id == id then
-            return GAMBITS[i]
-        end
-    end
-    return nil
+    return gambits.by_id(id)
 end
 
 local function point_in_rect(x, y, rect)
@@ -305,10 +287,10 @@ local function reset_obstacles(self, config)
     end
 end
 
-local function reset_hand(self)
+local function reset_hand(self, figures)
     self.hand = {}
-    for i = 1, #self.figure_collection do
-        self.hand[#self.hand + 1] = create_piece_object(self, self.figure_collection[i])
+    for i = 1, #figures do
+        self.hand[#self.hand + 1] = create_piece_object(self, figures[i])
     end
     self.selected_hand = nil
     self.dragging_hand = false
@@ -359,11 +341,14 @@ local function draw_background(self)
         height = viewport.h
         width = height * image_aspect
     end
-    spawn_visual(self, "background", viewport.x + viewport.w * 0.5,
+    local animation = self.level_config and self.level_config.hard
+        and "background_hard" or "background"
+    spawn_visual(self, animation, viewport.x + viewport.w * 0.5,
         viewport.y + viewport.h * 0.5, width, height, Z.background, COLORS.white)
 end
 
 local function draw_stone_panel(self, rect, filled)
+    local frame_tint = COLORS.white
     local scale = rect.w / PANEL_TOP_IMAGE_WIDTH
     local top_height = PANEL_TOP_IMAGE_HEIGHT * scale
     local bottom_height = PANEL_BOTTOM_IMAGE_HEIGHT * scale
@@ -378,10 +363,10 @@ local function draw_stone_panel(self, rect, filled)
 
     spawn_visual(self, "panel_top", rect.x + rect.w * 0.5,
         rect.y + rect.h - top_height * 0.5,
-        rect.w, top_height, Z.panel + 0.02, COLORS.white)
+        rect.w, top_height, Z.panel + 0.02, frame_tint)
     spawn_visual(self, "panel_bottom", rect.x + rect.w * 0.5,
         rect.y + bottom_height * 0.5,
-        rect.w, bottom_height, Z.panel + 0.02, COLORS.white)
+        rect.w, bottom_height, Z.panel + 0.02, frame_tint)
 
     local side_start = rect.y + bottom_height * 0.76
     local side_end = rect.y + rect.h - top_height * 0.72
@@ -391,14 +376,15 @@ local function draw_stone_panel(self, rect, filled)
     for i = 1, segment_count do
         local y = side_start + (i - 0.5) * segment_step
         spawn_visual(self, "panel_side_left", rect.x + side_width * 0.5, y,
-            side_width, side_height, Z.panel + 0.02, COLORS.white)
+            side_width, side_height, Z.panel + 0.02, frame_tint)
         spawn_visual(self, "panel_side_right", rect.x + rect.w - side_width * 0.5, y,
-            side_width, side_height, Z.panel + 0.02, COLORS.white)
+            side_width, side_height, Z.panel + 0.02, frame_tint)
     end
 end
 
 local function draw_score(self, current_score)
     local rect = self.rects.score
+    local hard = self.level_config and self.level_config.hard
     spawn_visual(self, "score_panel_trimmed_v2", rect.x + rect.w * 0.5, rect.y + rect.h * 0.5,
         rect.w, rect.h, Z.panel, COLORS.white)
 
@@ -422,9 +408,14 @@ local function draw_score(self, current_score)
             filled, inner_height + self.score_pulse, Z.marker + 0.02, bar_color)
     end
 
-    spawn_label(self, string.format("LEVEL %d     SCORE %d / %d",
-            self.level, animated_score, self.target_score),
-        rect.x + rect.w * 0.5, rect.y + 63, Z.text, 0.76, COLORS.ink, 470, 28)
+    local level_text = hard
+        and string.format("HARD TRIAL %d     SCORE %d / %d",
+            self.level, animated_score, self.target_score)
+        or string.format("LEVEL %d     SCORE %d / %d",
+            self.level, animated_score, self.target_score)
+    spawn_label(self, level_text,
+        rect.x + rect.w * 0.5, rect.y + 63, Z.text, 0.76,
+        hard and COLORS.hard_ink or COLORS.ink, 470, 28)
     spawn_label(self, string.format("ATTACK %d  x  DEFENSE %d  =  %d",
             current_score.attack, current_score.defense, current_score.total),
         rect.x + rect.w * 0.5, rect.y + 48,
@@ -439,8 +430,20 @@ local function draw_gambits(self)
         Z.text, 0.80, COLORS.ink, rect.w - 24, 34)
 
     self.gambit_rects = {}
-    local start_y = rect.y + rect.h - 112
-    local spacing = 157
+    local start_y = rect.y + rect.h - 88
+    local collected_count = 0
+    for i = 1, #GAMBITS do
+        if self.gambit_collection[GAMBITS[i].id] then
+            collected_count = collected_count + 1
+        end
+    end
+    local available = start_y - (rect.y + 82)
+    local spacing = collected_count > 1
+        and math.min(157, available / (collected_count - 1)) or 0
+    local base_icon_size = collected_count <= 3 and 92
+        or math.max(34, math.min(68, spacing * 0.72))
+    local item_height = collected_count > 1
+        and math.max(42, math.min(132, spacing)) or 132
     local visible_index = 0
     local hovered_y
     local hover_progress = self.gambit_hover_progress or 0
@@ -455,15 +458,18 @@ local function draw_gambits(self)
             end
             self.gambit_rects[i] = {
                 x = rect.x + 20,
-                y = base_y - 61,
+                y = base_y - item_height * 0.5,
                 w = rect.w - 40,
-                h = 132,
+                h = item_height,
             }
-            local icon_size = self.hovered_gambit == i and 92 + hover_progress * 7 or 92
+            local icon_size = self.hovered_gambit == i
+                and base_icon_size + hover_progress * 7 or base_icon_size
             spawn_visual(self, gambit.animation, rect.x + rect.w * 0.5, y,
                 icon_size, icon_size, Z.piece, COLORS.white)
-            spawn_label(self, gambit.name, rect.x + rect.w * 0.5, y - 56,
-                Z.text, 0.69, COLORS.ink, rect.w - 20, 26)
+            spawn_label(self, gambit.name, rect.x + rect.w * 0.5,
+                y - icon_size * 0.56, Z.text,
+                collected_count <= 3 and 0.69 or 0.46,
+                COLORS.ink, rect.w - 20, 22)
         end
     end
 
@@ -481,11 +487,13 @@ local function draw_gambits(self)
             self.viewport.w, self.viewport.h, Z.hover_backdrop,
             with_alpha(COLORS.hover_backdrop, overlay_alpha))
 
-        local icon_size = 92 + hover_progress * 7
+        local icon_size = base_icon_size + hover_progress * 7
         spawn_visual(self, gambit.animation, rect.x + rect.w * 0.5, hovered_y,
             icon_size, icon_size, Z.hover_piece, COLORS.white)
-        spawn_label(self, gambit.name, rect.x + rect.w * 0.5, hovered_y - 56,
-            Z.hover_text, 0.69, COLORS.ink, rect.w - 20, 26)
+        spawn_label(self, gambit.name, rect.x + rect.w * 0.5,
+            hovered_y - icon_size * 0.56, Z.hover_text,
+            collected_count <= 3 and 0.69 or 0.46,
+            COLORS.ink, rect.w - 20, 22)
         spawn_visual(self, "score_panel_trimmed_v2", box_x, box_y,
             tooltip_width, tooltip_height, Z.hover_panel,
             with_alpha(COLORS.white, overlay_alpha))
@@ -557,13 +565,19 @@ local function draw_board(self, preview_cells)
     local frame = self.rects.board_frame
     local cell = rect.w / 8
 
-    spawn_visual(self, "board_frame_opaque", frame.x + frame.w * 0.5,
-        frame.y + frame.h * 0.5, frame.w, frame.h, Z.board_frame, COLORS.white)
+    local hard = self.level_config and self.level_config.hard
+    local frame_animation = hard and "board_frame_hard" or "board_frame_opaque"
+    spawn_visual(self, frame_animation, frame.x + frame.w * 0.5,
+        frame.y + frame.h * 0.5, frame.w, frame.h, Z.board_frame,
+        COLORS.white)
 
     for row = 1, 8 do
         for column = 1, 8 do
             local x, y = cell_center(self, column, row)
-            local animation = (column + row) % 2 == 0 and "tile_light" or "tile_dark"
+            local light = (column + row) % 2 == 0
+            local animation = hard
+                and (light and "tile_light_hard" or "tile_dark_hard")
+                or (light and "tile_light" or "tile_dark")
             spawn_visual(self, animation, x, y, cell + 0.5, cell + 0.5,
                 Z.tile, COLORS.white)
         end
@@ -594,11 +608,83 @@ local function draw_board(self, preview_cells)
     end
 end
 
+local function draw_gambit_choice_popup(self)
+    local progress = self.reward_popup_progress or 0
+    local closing = self.phase == "reward_closing"
+    local u = progress - 1
+    local eased = closing and progress * progress
+        or 1 + 2.70158 * u * u * u + 1.70158 * u * u
+    local popup_scale = 0.84 + eased * 0.16
+    local popup_alpha = closing and progress or math.min(1, progress * 2)
+    local center_x = self.viewport.x + self.viewport.w * 0.5
+    local center_y = self.viewport.y + self.viewport.h * 0.5
+    local popup_width = math.min(GAMBIT_CHOICE_POPUP_WIDTH, self.viewport.w - 72)
+    local popup_height = popup_width * GAMBIT_CHOICE_POPUP_IMAGE_HEIGHT
+        / GAMBIT_CHOICE_POPUP_IMAGE_WIDTH
+    local choice_offset = popup_width * 0.245
+    local choice_width = popup_width * 0.37
+
+    draw_rect(self, center_x, center_y, self.viewport.w, self.viewport.h,
+        Z.popup_backdrop, with_alpha(COLORS.modal_backdrop, progress))
+    spawn_visual(self, "gambit_choice_popup", center_x, center_y,
+        popup_width * popup_scale, popup_height * popup_scale,
+        Z.popup, with_alpha(COLORS.white, popup_alpha))
+    spawn_label(self, "CHOOSE ONE GAMBIT", center_x,
+        center_y + popup_height * 0.405 * popup_scale,
+        Z.popup_text, 0.66 * popup_scale,
+        with_alpha(COLORS.ink, popup_alpha), popup_width * 0.48, 30)
+
+    self.choice_button_rects = {}
+    for i = 1, 2 do
+        local choice = assert(self.reward_choices and self.reward_choices[i],
+            "hard reward needs two gambit choices")
+        local direction = i == 1 and -1 or 1
+        local choice_x = center_x + direction * choice_offset
+        local hover_scale = self.choice_hover == i and 1.035 or 1
+        local content_scale = popup_scale * hover_scale
+        spawn_visual(self, choice.animation, choice_x,
+            center_y + 78 * popup_scale,
+            86 * content_scale, 86 * content_scale, Z.popup_icon,
+            with_alpha(COLORS.white, popup_alpha))
+        spawn_label(self, choice.name, choice_x,
+            center_y + 18 * popup_scale,
+            Z.popup_text, 0.66 * popup_scale,
+            with_alpha(COLORS.ink, popup_alpha), choice_width, 28)
+        for line_index = 1, #choice.description do
+            spawn_label(self, choice.description[line_index], choice_x,
+                center_y - (24 + (line_index - 1) * 18) * popup_scale,
+                Z.popup_text, 0.39 * popup_scale,
+                with_alpha(COLORS.muted_ink, popup_alpha), choice_width, 20)
+        end
+
+        local button_width = 154
+        local button_height = button_width * REWARD_BUTTON_IMAGE_HEIGHT
+            / REWARD_BUTTON_IMAGE_WIDTH
+        local button_y = center_y - 142 * popup_scale
+        self.choice_button_rects[i] = {
+            x = choice_x - button_width * 0.5,
+            y = button_y - button_height * 0.5,
+            w = button_width,
+            h = button_height,
+        }
+        spawn_visual(self, "reward_button", choice_x, button_y,
+            button_width * content_scale, button_height * content_scale,
+            Z.popup_icon, with_alpha(COLORS.white, popup_alpha))
+        spawn_label(self, "CHOOSE", choice_x, button_y, Z.popup_text,
+            0.54 * popup_scale, with_alpha(COLORS.ink, popup_alpha),
+            button_width - 24, 22)
+    end
+end
+
 local function draw_level_popup(self)
     local reward_popup = self.phase == "reward" or self.phase == "reward_closing"
     local failure_popup = self.phase == "failed" or self.phase == "failed_closing"
     local closing_popup = self.phase == "reward_closing" or self.phase == "failed_closing"
     if not reward_popup and not failure_popup then
+        return
+    end
+    if reward_popup and self.level_config.hard then
+        draw_gambit_choice_popup(self)
         return
     end
 
@@ -609,7 +695,7 @@ local function draw_level_popup(self)
     local button = self.rects.reward_button
     local reward = reward_popup and self.level_config.reward or nil
     local icon_animation = failure_popup and "obstacle_stones"
-        or reward and reward.id or "gambit_laurel"
+        or reward and reward.id or nil
     if reward and reward.type == "gambit" then
         icon_animation = assert(gambit_by_id(reward.id), "missing Gambit art").animation
     end
@@ -643,15 +729,19 @@ local function draw_level_popup(self)
         Z.popup_text, 0.68 * popup_scale, with_alpha(COLORS.ink, popup_alpha),
         title.w, title.h)
 
-    local icon_size = failure_popup and 96
-        or reward and reward.type == "figure" and 112 or 104
+    local icon_size = failure_popup and 96 or 104
     local icon_x, icon_y = animated_rect_center(icon)
-    spawn_visual(self, icon_animation, icon_x, icon_y,
-        icon_size * popup_scale, icon_size * popup_scale, Z.popup_icon,
-        with_alpha(COLORS.white, popup_alpha))
+    if icon_animation then
+        spawn_visual(self, icon_animation, icon_x, icon_y,
+            icon_size * popup_scale, icon_size * popup_scale, Z.popup_icon,
+            with_alpha(COLORS.white, popup_alpha))
+    else
+        spawn_label(self, string.format("TRIAL %d CLEARED", self.level),
+            icon_x, icon_y, Z.popup_text, 0.62 * popup_scale,
+            with_alpha(COLORS.ink, popup_alpha), icon.w + 80, 30)
+    end
     local copy_x, copy_y = animated_rect_center(copy)
     local copy_top = failure_popup and "NO FIGURES LEFT"
-        or reward and reward.type == "figure" and "NEW FIGURE"
         or reward and "NEW GAMBIT" or "FORMATION HELD"
     local copy_bottom = failure_popup and "TRY A NEW FORMATION"
         or reward and reward.name or "THE NEXT TRIAL AWAITS"
@@ -750,13 +840,22 @@ local function animate_piece_drop(self, entry, column, row)
         end)
 end
 
+local function calibrated_target(self, config, level_index)
+    return difficulty.target_for(config, config.figures,
+        self.gambit_collection, {
+            restarts = 4,
+            iterations = 500,
+            seed = 20260720 + level_index * 7919,
+        })
+end
+
 local function load_level(self, level_index)
     local config = assert(levels.configs[level_index], "missing level config")
     self.level = level_index
     self.level_config = config
     self.score = 0
     self.display_score = 0
-    self.target_score = config.target
+    self.target_score = calibrated_target(self, config, level_index)
     self.phase = "playing"
     self.score_animating = false
     self.score_anim_losing = false
@@ -765,24 +864,23 @@ local function load_level(self, level_index)
     self.gambit_hover_target = nil
     self.gambit_hover_progress = 0
     self.reward_button_hover = false
+    self.choice_hover = nil
+    self.pending_reward_choice = nil
     self.reward_popup_progress = 0
+    self.reward_choices = config.hard
+        and gambits.reward_choices(self.gambit_collection, level_index) or nil
     destroy_piece_objects(self)
     reset_board(self)
     reset_obstacles(self, config)
-    reset_hand(self)
+    reset_hand(self, config.figures)
     redraw(self)
 end
 
 local function claim_reward(self)
-    local reward = self.level_config.reward
-    if not reward then
-        -- Most levels are trials between milestone rewards.
-    elseif reward.type == "figure" then
-        self.figure_collection[#self.figure_collection + 1] = reward.id
-    elseif reward.type == "gambit" then
-        self.gambit_collection[reward.id] = true
-    else
-        error("unknown reward type: " .. tostring(reward.type))
+    if self.level_config.hard then
+        local choice = assert(self.reward_choices[self.pending_reward_choice],
+            "hard reward choice was not selected")
+        self.gambit_collection[choice.id] = true
     end
 
     if self.level < #levels.configs then
@@ -865,7 +963,18 @@ local function cancel_selected_piece(self)
 end
 
 local function begin_pointer_action(self, x, y)
-    if self.phase == "reward" and self.reward_popup_progress >= 0.95
+    if self.phase == "reward" and self.level_config.hard
+        and self.reward_popup_progress >= 0.95 then
+        for i = 1, #(self.choice_button_rects or {}) do
+            if point_in_rect(x, y, self.choice_button_rects[i]) then
+                self.pending_reward_choice = i
+                self.phase = "reward_closing"
+                self.choice_hover = nil
+                return
+            end
+        end
+        return
+    elseif self.phase == "reward" and self.reward_popup_progress >= 0.95
         and point_in_rect(x, y, self.rects.reward_button) then
         self.phase = "reward_closing"
         self.reward_button_hover = false
@@ -946,13 +1055,28 @@ local function update_hover(self, x, y)
 
     local popup_open = self.phase == "reward" or self.phase == "failed"
     local reward_button_hover = popup_open
+        and (self.phase == "failed" or not self.level_config.hard)
         and point_in_rect(x, y, self.rects.reward_button)
     local reward_hover_changed = reward_button_hover ~= self.reward_button_hover
     if reward_hover_changed then
         self.reward_button_hover = reward_button_hover
     end
 
-    if cell_changed or gambit_changed or reward_hover_changed then
+    local choice_hover
+    if self.phase == "reward" and self.level_config.hard then
+        for i = 1, #(self.choice_button_rects or {}) do
+            if point_in_rect(x, y, self.choice_button_rects[i]) then
+                choice_hover = i
+                break
+            end
+        end
+    end
+    local choice_hover_changed = choice_hover ~= self.choice_hover
+    if choice_hover_changed then
+        self.choice_hover = choice_hover
+    end
+
+    if cell_changed or gambit_changed or reward_hover_changed or choice_hover_changed then
         redraw(self)
     end
 end
@@ -991,6 +1115,7 @@ local function update_score_animation(self, dt)
                 self.phase = self.phase == "completing" and "reward" or "failed"
                 self.reward_popup_progress = 0
                 self.reward_button_hover = false
+                self.choice_hover = nil
                 self.hovered_gambit = nil
                 self.gambit_hover_target = nil
                 self.gambit_hover_progress = 0
@@ -1079,6 +1204,7 @@ local function apply_window_layout(self, window_width, window_height)
     self.gambit_hover_target = nil
     self.gambit_hover_progress = 0
     self.reward_button_hover = false
+    self.choice_hover = nil
     if self.board_objects then
         snap_board_pieces_to_layout(self)
     end
@@ -1103,6 +1229,8 @@ end
 
 function init(self)
     assert(chess.self_test())
+    assert(difficulty.self_test())
+    assert(gambits.self_test())
     assert(levels.self_test())
     print("CHALATRO: chess, scoring, and level self-tests passed")
     msg.post(".", "acquire_input_focus")
@@ -1132,10 +1260,6 @@ function init(self)
     self.pointer_x = nil
     self.pointer_y = nil
     self.wobble_time = 0
-    self.figure_collection = {}
-    for i = 1, #levels.starting_figures do
-        self.figure_collection[i] = levels.starting_figures[i]
-    end
     self.gambit_collection = {}
     for id, collected in pairs(levels.starting_gambits) do
         self.gambit_collection[id] = collected
@@ -1158,6 +1282,21 @@ end
 function final(self)
     window.set_listener(nil)
     destroy_scene(self)
+end
+
+function on_reload(self)
+    if not self.level_config or self.level == 0 then
+        return
+    end
+    self.target_score = calibrated_target(self, self.level_config, self.level)
+    local score = chess.score_board(self.board, self.gambit_collection, self.obstacles)
+    self.score = score.total
+    self.display_score = score.total
+    if score.total >= self.target_score
+        and (self.phase == "playing" or self.phase == "failing" or self.phase == "failed") then
+        self.phase = "completing"
+    end
+    redraw(self)
 end
 
 function on_input(self, action_id, action)

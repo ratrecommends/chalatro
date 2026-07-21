@@ -97,8 +97,16 @@ function M.score_board(board, gambits, obstacles)
     local attack = 0
     local oracle_bonus = 0
     local protection_links = 0
+    local royal_guard_links = 0
+    local piece_counts = {}
+    local distinct_piece_types = 0
 
     for source_key, piece in pairs(board) do
+        if not piece_counts[piece] then
+            piece_counts[piece] = 0
+            distinct_piece_types = distinct_piece_types + 1
+        end
+        piece_counts[piece] = piece_counts[piece] + 1
         local column, row = decode_key(source_key)
         local cells = M.attacks(piece, column, row, board, obstacles)
         relations[source_key] = {}
@@ -114,6 +122,9 @@ function M.score_board(board, gambits, obstacles)
             if board[target_key] then
                 relations[source_key][target_key] = true
                 protection_links = protection_links + 1
+                if piece == "king" then
+                    royal_guard_links = royal_guard_links + 1
+                end
                 increment(defense_counts, target_key)
             end
         end
@@ -133,13 +144,29 @@ function M.score_board(board, gambits, obstacles)
     end
 
     local phalanx_bonus = gambits and gambits.phalanx and mutual_pairs or 0
+    local royal_guard_bonus = gambits and gambits.royal_guard and royal_guard_links or 0
+    local cavalry_bonus = gambits and gambits.cavalry
+        and (piece_counts.knight or 0) * 2 or 0
+    local regency_bonus = gambits and gambits.regency
+        and (piece_counts.queen or 0) * 2 or 0
+    local concord_bonus = gambits and gambits.concord and distinct_piece_types or 0
+    local bastion_bonus = gambits and gambits.bastion and (piece_counts.rook or 0) or 0
+    local vanguard_bonus = gambits and gambits.vanguard and (piece_counts.pawn or 0) or 0
+    attack = attack + royal_guard_bonus + cavalry_bonus + regency_bonus + concord_bonus
     local defense = protection_links + phalanx_bonus + oracle_bonus
+        + bastion_bonus + vanguard_bonus
     return {
         attack = attack,
         defense = defense,
         protection_links = protection_links,
         mutual_pairs = mutual_pairs,
         oracle_bonus = oracle_bonus,
+        royal_guard_bonus = royal_guard_bonus,
+        cavalry_bonus = cavalry_bonus,
+        regency_bonus = regency_bonus,
+        concord_bonus = concord_bonus,
+        bastion_bonus = bastion_bonus,
+        vanguard_bonus = vanguard_bonus,
         total = attack * defense,
         attack_counts = attack_counts,
         defense_counts = defense_counts,
@@ -255,6 +282,31 @@ function M.self_test()
     assert(bishop_score.attack == 13, "a central bishop attacks thirteen empty cells")
     assert(bishop_score.defense == 1, "Oracle gives bishops one additional defense")
     assert(bishop_score.total == 13, "Oracle participates in multiplicative scoring")
+
+    local royal_guard_board = {
+        [M.key(4, 4)] = "king",
+        [M.key(5, 5)] = "pawn",
+    }
+    local royal_guard_score = M.score_board(royal_guard_board, { royal_guard = true })
+    assert(royal_guard_score.royal_guard_bonus == 1,
+        "Royal Guard adds attack for figures defended by a King")
+
+    local army_bonus_board = {
+        [M.key(2, 2)] = "knight",
+        [M.key(4, 4)] = "rook",
+        [M.key(6, 6)] = "queen",
+        [M.key(7, 7)] = "pawn",
+    }
+    local army_bonus_score = M.score_board(army_bonus_board, {
+        cavalry = true, bastion = true, regency = true,
+        vanguard = true, concord = true,
+    })
+    assert(army_bonus_score.cavalry_bonus == 2
+        and army_bonus_score.bastion_bonus == 1
+        and army_bonus_score.regency_bonus == 2
+        and army_bonus_score.vanguard_bonus == 1
+        and army_bonus_score.concord_bonus == 4,
+        "figure gambits apply their advertised bonuses")
 
     local obstacles = { [M.key(1, 3)] = true }
     local obstacle_cells = M.attacks("rook", 1, 1, {}, obstacles)
